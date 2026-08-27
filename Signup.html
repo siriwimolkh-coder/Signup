@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>สมัครกิจกรรมสะสมแต้ม</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; min-height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Sarabun", sans-serif;
+    background: linear-gradient(180deg, #06c755 0%, #06c755 220px, #f6f8f7 220px);
+  }
+  .header { text-align: center; padding: 36px 20px 20px; color: #fff; }
+  .header h2 { margin: 0; font-size: 24px; font-weight: 700; }
+  .header p { margin: 6px 0 0; font-size: 14px; opacity: 0.9; }
+  .card {
+    background: #fff; margin: 0 16px; border-radius: 18px; padding: 24px 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08); position: relative; top: -40px;
+  }
+  label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-top: 16px; }
+  label:first-child { margin-top: 0; }
+  input {
+    width: 100%; padding: 13px 14px; margin-top: 6px; font-size: 16px;
+    border: 1.5px solid #e2e5e2; border-radius: 12px; background: #fafbfa;
+    outline: none; transition: border-color .15s;
+  }
+  input:focus { border-color: #06c755; background: #fff; }
+  button {
+    width: 100%; margin-top: 26px; padding: 15px; background: #06c755; color: #fff;
+    border: none; border-radius: 12px; font-size: 16px; font-weight: 700;
+    box-shadow: 0 4px 12px rgba(6,199,85,0.35);
+  }
+  button:active { transform: scale(0.98); }
+  button:disabled { background: #b8e6c8; box-shadow: none; }
+  #status { text-align: center; margin-top: 14px; font-size: 13px; color: #888; min-height: 18px; }
+  #status.error { color: #e0483e; font-weight: 600; }
+  #retryBtn {
+    display: none; margin-top: 10px; background: #fff; color: #06c755;
+    border: 1.5px solid #06c755; box-shadow: none; font-size: 14px; padding: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2>สมัครกิจกรรมสะสมแต้ม</h2>
+  <p>กรอกข้อมูลเพื่อเข้าร่วมสะสมแต้มและรับสิทธิประโยชน์</p>
+</div>
+
+<div class="card">
+  <form id="memberForm">
+    <label>ชื่อ-นามสกุล / ชื่อร้าน</label>
+    <input type="text" id="fldName" placeholder="เช่น ร้านอาหารบ้านสวน" required>
+
+    <label>ที่อยู่จัดส่ง</label>
+    <input type="text" id="fldAddress" placeholder="ที่อยู่สำหรับจัดส่งสินค้า" required>
+
+    <label>เบอร์โทรศัพท์</label>
+    <input type="tel" id="fldPhone" placeholder="08xxxxxxxx" required>
+
+    <button type="submit" id="submitBtn">เข้าร่วมกิจกรรม</button>
+    <div id="status"></div>
+    <button type="button" id="retryBtn">ลองเชื่อมต่อ LINE ใหม่</button>
+  </form>
+</div>
+
+<script>
+  // ⚠️ แก้ไขตรงนี้: ใส่ LIFF ID ของคุณเอง (หาได้จาก LINE Developers Console > LIFF)
+  var YOUR_LIFF_ID = '2011055322-9zPuaduh'; // YOUR_LIFF_ID = กรอก LIFF ID ของคุณ
+
+  // ⚠️ แก้ไขตรงนี้: ใส่ Web App URL ของ Apps Script ที่ deploy ไว้ (ลงท้ายด้วย /exec)
+  var YOUR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd4rCTLFJaVju73VT1a3HBtSEmDvx-mkYn2o3OngKtl-4UUZ-LFVJwL4c22I58bVnM0g/exec'; // YOUR_APPS_SCRIPT_URL = กรอก Web App URL ของคุณ
+
+  var userId = null;
+  var statusEl = document.getElementById('status');
+  var btn = document.getElementById('submitBtn');
+  var retryBtn = document.getElementById('retryBtn');
+  var connectTimer = null;
+
+  function setStatus(msg, isError) {
+    statusEl.textContent = msg;
+    statusEl.className = isError ? 'error' : '';
+  }
+
+  function connectLine() {
+    retryBtn.style.display = 'none';
+    setStatus('กำลังเชื่อมต่อ LINE...');
+
+    connectTimer = setTimeout(function() {
+      setStatus('เชื่อมต่อ LINE ช้ากว่าปกติ กรุณาลองใหม่ หรือเปิดผ่านเมนูของ LINE อีกครั้ง', true);
+      retryBtn.style.display = 'block';
+    }, 8000);
+
+    liff.init({ liffId: YOUR_LIFF_ID }).then(function() {
+      clearTimeout(connectTimer);
+
+      if (!liff.isLoggedIn()) {
+        setStatus('กำลังเชื่อมต่อบัญชี LINE...');
+        liff.login();
+        return null;
+      }
+      return liff.getProfile();
+    }).then(function(profile) {
+      if (!profile) return;
+      userId = profile.userId;
+      setStatus('เชื่อมต่อสำเร็จ: ' + userId.substring(0, 8) + '...');
+    }).catch(function(err) {
+      clearTimeout(connectTimer);
+      setStatus('LIFF ERROR code=' + (err.code || 'ไม่ระบุ') + ' msg=' + err.message, true);
+      retryBtn.style.display = 'block';
+    });
+  }
+
+  retryBtn.addEventListener('click', connectLine);
+  connectLine();
+
+  document.getElementById('memberForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    if (!userId) {
+      setStatus('กำลังเชื่อมต่อ LINE กรุณารอสักครู่แล้วลองใหม่', true);
+      return;
+    }
+
+    var data = {
+      userId: userId,
+      name: document.getElementById('fldName').value,
+      address: document.getElementById('fldAddress').value,
+      phone: document.getElementById('fldPhone').value
+    };
+
+    btn.disabled = true;
+    btn.textContent = 'กำลังบันทึก...';
+    setStatus('');
+
+    // สำคัญ: ต้องส่งเป็น Content-Type: text/plain เพื่อเลี่ยง CORS preflight (OPTIONS)
+    // ที่ Apps Script Web App ไม่รองรับ — ถ้าใช้ application/json ตรงๆ จะเจอ CORS error ทันที
+    fetch(YOUR_APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(data)
+    })
+      .then(function(res) { return res.json(); })
+      .then(function(result) {
+        if (!result.ok) throw new Error(result.error || 'บันทึกไม่สำเร็จ');
+        btn.textContent = 'เข้าร่วมสำเร็จ ✓';
+        setStatus('บันทึกข้อมูลเรียบร้อย กำลังปิดหน้าต่าง...');
+        setTimeout(function() {
+          if (liff.isInClient()) { liff.closeWindow(); }
+        }, 1200);
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'เข้าร่วมกิจกรรม';
+        setStatus('เกิดข้อผิดพลาด: ' + err.message, true);
+      });
+  });
+</script>
+
+</body>
+</html>
